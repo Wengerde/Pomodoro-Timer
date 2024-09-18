@@ -1,12 +1,15 @@
 import tkinter as tk
 from tkinter import ttk, messagebox, simpledialog
-
+import winsound  # Für den Ton
+import json  # Zum Speichern und Laden der Aufgaben
+import os  # Um zu prüfen, ob die Datei existiert
 
 class PomodoroTimer(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Pomodoro Timer")
-        self.geometry("600x600")
+        self.geometry("600x700")  # Höhe auf 700 gesetzt, um sicherzustellen, dass die Buttons sichtbar sind
+        self.minsize(600, 700)  # Minimale Fenstergröße festgelegt
         self.configure(bg="#2E2E2E")
 
         self.pomodoro_time = 25 * 60  # 25 minutes
@@ -17,7 +20,11 @@ class PomodoroTimer(tk.Tk):
         self.on_break = False
         self.cycle = 0
 
+        self.tasks_file = "tasks.json"  # Datei für die Aufgaben
+        self.tasks = []  # Liste der Aufgaben
+
         self.create_widgets()
+        self.load_tasks()  # Lädt die Aufgaben beim Start
 
     def create_widgets(self):
         self.style = ttk.Style(self)
@@ -92,6 +99,9 @@ class PomodoroTimer(tk.Tk):
                                              style="TButton")
         self.delete_task_button.grid(row=0, column=2, padx=10)
 
+        # Speichert die Aufgaben, wenn das Fenster geschlossen wird
+        self.protocol("WM_DELETE_WINDOW", self.on_closing)
+
     def format_time(self, seconds):
         mins, secs = divmod(seconds, 60)
         return f"{mins:02}:{secs:02}"
@@ -106,6 +116,8 @@ class PomodoroTimer(tk.Tk):
                 self.running = False
                 self.on_break = not self.on_break
                 self.cycle += 1
+                self.play_sound()  # Ton abspielen, wenn der Timer abläuft
+
                 if self.cycle % 4 == 0:
                     self.current_time = self.long_break_time
                     messagebox.showinfo("Pomodoro Timer", "Long Break!")
@@ -141,6 +153,7 @@ class PomodoroTimer(tk.Tk):
         task = simpledialog.askstring("Add Task", "Enter task:")
         if task:
             self.todo_listbox.insert(tk.END, task)
+            self.tasks.append(task)
 
     def complete_task(self):
         selected_tasks = self.todo_listbox.curselection()
@@ -148,11 +161,33 @@ class PomodoroTimer(tk.Tk):
             task = self.todo_listbox.get(task_index)
             self.todo_listbox.delete(task_index)
             self.todo_listbox.insert(tk.END, f"[Completed] {task}")
+            self.tasks[task_index] = f"[Completed] {task}"
 
     def delete_task(self):
         selected_tasks = self.todo_listbox.curselection()
         for task_index in selected_tasks[::-1]:
             self.todo_listbox.delete(task_index)
+            del self.tasks[task_index]
+
+    def play_sound(self):
+        winsound.Beep(440, 1000)  # Spielt einen Ton mit 440 Hz für 1 Sekunde
+
+    def save_tasks(self):
+        # Speichert die Aufgaben in einer JSON-Datei
+        with open(self.tasks_file, 'w') as f:
+            json.dump(self.tasks, f)
+
+    def load_tasks(self):
+        # Lädt die Aufgaben aus der JSON-Datei, falls vorhanden
+        if os.path.exists(self.tasks_file):
+            with open(self.tasks_file, 'r') as f:
+                self.tasks = json.load(f)
+            for task in self.tasks:
+                self.todo_listbox.insert(tk.END, task)
+
+    def on_closing(self):
+        self.save_tasks()  # Speichert die Aufgaben, bevor das Fenster geschlossen wird
+        self.destroy()
 
 
 if __name__ == "__main__":
